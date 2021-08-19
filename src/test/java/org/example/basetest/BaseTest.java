@@ -33,9 +33,9 @@ public class BaseTest {
     public void beforeEach() {
         driverManager.getDriver().get(TestPropManager.getTestPropManager().getProperty(BASE_URL));
     }
-//
-//    @AfterClass
-//    public static void afterAll() {
-//        InitManager.quitFramework();
-//    }
+
+    @AfterClass
+    public static void afterAll() {
+        InitManager.quitFramework();
+    }
 }
