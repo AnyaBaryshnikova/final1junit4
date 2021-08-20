@@ -25,9 +25,7 @@ public class DepositPage extends BasePage {
     @FindBy(xpath = "//span[@class='js-calc-amount']")
     WebElement amountNow;
 
-    // срок вклада
-    @FindBy(xpath = "//li[contains(text(), 'месяц')]")
-    List<WebElement> monthsList;
+
 
     // Ежемесячный платеж
     @FindBy(xpath = "//input[@name='replenish']")
@@ -51,6 +49,7 @@ public class DepositPage extends BasePage {
 
 
     //сумма к снятию
+
     @FindBy(xpath = "//span[@class='js-calc-result']")
     WebElement amountWithdarwn;
 
@@ -58,7 +57,12 @@ public class DepositPage extends BasePage {
     @FindBy(xpath = "//div[@class='jq-selectbox__select-text']")
     WebElement months;
 
+    @FindBy(xpath = "//div[@class='jq-selectbox__trigger']")
+    WebElement monthsBtn;
 
+    private int monthlyPay = 0;    //ежемесячное пополнение
+    private int firstPay = 0;       //первое пополнение
+    private int monthsDeposit = 0;  //количество месяцев
 
 
     public DepositPage checkDepositPageOpen() {
@@ -78,12 +82,12 @@ public class DepositPage extends BasePage {
     public DepositPage choseCurrency(String name) {
         scrollWithOffset(currency, 0, -500);
         if (name.equals("Рубли")) {
-            WebElement rubCurr = currency.findElement(By.xpath("./label[1]/input"));
+            WebElement rubCurr = currency.findElement(By.xpath("./label[1]"));
             rubCurr.click();
             return this;
         }
         if (name.equals("Доллары США")) {
-            WebElement dolCurr = currency.findElement(By.xpath("./label[2]/input"));
+            WebElement dolCurr = currency.findElement(By.xpath("./label[2]"));
             dolCurr.click();
             return this;
         }
@@ -98,27 +102,35 @@ public class DepositPage extends BasePage {
      * @return возвращаем ту же страничку
      */
     @Step("Вводим сумму вклада {money}")
-    public DepositPage addDepositAmount(int money) {
+    public DepositPage addDepositAmount(String money) {
+        firstPay = Integer.parseInt(money.replace(" ", ""));
 
-        fillFields(depositAmount, money + "");
-        wait.until(ExpectedConditions.textToBePresentInElement(amountNow, money + ""));
+        fillFields(depositAmount, money.replace(" ", ""));
+        wait.until(ExpectedConditions.textToBePresentInElement(amountNow, money));
         return this;
     }
 
     /**
      * Добавляем срок депозита
+     *
      * @param amount количество месяцев, срок
      * @return
      */
     @Step()
-    public DepositPage addMonths(int amount){
-        for (WebElement month : monthsList) {
-            if (month.getText().contains(amount + "")) {
-                waitUtilElementToBeClickable(month).click();
-                return this;
-            }
+    public DepositPage addMonths(int amount) {
+        monthsDeposit = amount;
+        int index = ((int)( amount / 3) + amount % 3);
+        monthsBtn.click();
+        String el = String.format("//li[contains(text(), 'месяц')][%s]", index);
+
+
+        try {
+            WebElement month = driverManager.getDriver().findElement(By.xpath(el));
+            waitUtilElementToBeClickable(month).click();
+        } catch (Exception e) {
+            Assert.fail("Невозможно указать срок депозита равный " + amount + "мес.");
+
         }
-        Assert.fail("Невозможно указать срок депозита равный " + amount + "мес.");
         return this;
     }
 
@@ -129,27 +141,33 @@ public class DepositPage extends BasePage {
      * @return возвращаем ту же страничку
      */
     @Step("Вводим сумму ежемесячного платежа {money}")
-    public DepositPage addMounthlyPayment(int money) {
+    public DepositPage addMounthlyPayment(String money) {
+        String text = accuredInrest.getText();
+        monthlyPay = Integer.parseInt(money.replace(" ", ""));
 
-        fillFields(monthlyPayment, money + "");
-        wait.until(ExpectedConditions.not(ExpectedConditions.textToBePresentInElement(replenishment, "0")));
+        fillFields(monthlyPayment, money);
+        wait.until(ExpectedConditions.not(ExpectedConditions.textToBePresentInElement(accuredInrest, text)));
         return this;
     }
 
     /**
      * Поставить или убрать галочку
+     *
      * @param strElement название элемента
-     * @param flag значение
+     * @param flag       значение
      * @return
      */
     @Step("Ставим галочку на поле {strElement}")
-    public DepositPage selectCheckBox(String strElement, boolean flag){
-        switch (strElement){
+    public DepositPage selectCheckBox(String strElement, boolean flag) {
+        String text = accuredInrest.getText();
+        switch (strElement) {
             case "Ежемесячная капитализация":
                 checkCheckBox(capitalization, flag);
+                wait.until(ExpectedConditions.not(ExpectedConditions.textToBePresentInElement(accuredInrest, text)));
                 break;
             case "Частичное снятие":
                 checkCheckBox(partialWithdraw, flag);
+                wait.until(ExpectedConditions.not(ExpectedConditions.textToBePresentInElement(accuredInrest, text)));
                 break;
             default:
                 Assert.fail("Поле с наименованием '" + strElement + "' отсутствует на странице");
@@ -160,13 +178,14 @@ public class DepositPage extends BasePage {
 
     /**
      * Проверяем начисленный процент
+     *
      * @param expected процент, который ожидаем увидеть
      * @return
      */
-    public DepositPage checkAccuredInrest(double expected){
+    public DepositPage checkAccuredInrest(double expected) {
         double actual = Double.parseDouble(accuredInrest.getText().replace(",", ".").replace(" ", ""));
         Assert.assertTrue("Начисленный процент, который ожидали увидеть " + expected + ""
-                + "не совпадает с фактическим: " + actual, actual == expected);
+                + " не совпадает с фактическим: " + actual, actual == expected);
 
         return this;
 
@@ -174,16 +193,14 @@ public class DepositPage extends BasePage {
 
     /**
      * Проверяем пополнение за все месяцы
+     *
      * @return
      */
-    public DepositPage checkRefill(){
-
-        int mpayment = Integer.parseInt(accuredInrest.getText().replace(" ", ""));
-        int monthsAmount = Integer.parseInt(months.getText().replaceAll("[^\\d.]", ""));
+    public DepositPage checkRefill() {
 
         int actual = Integer.parseInt(replenishment.getText().replace(" ", ""));
 
-        Assert.assertTrue("Пополнение за все месяцы не совпадает с ожидаемым", mpayment * (monthsAmount - 1) == actual);
+        Assert.assertTrue("Пополнение за все месяцы не совпадает с ожидаемым", monthlyPay * (monthsDeposit - 1) == actual);
 
         return this;
 
@@ -191,18 +208,15 @@ public class DepositPage extends BasePage {
 
     /**
      * Проверяем сумму к снятию
+     *
      * @return
      */
-    public DepositPage checkAmountWithdrawn(){
+    public DepositPage checkAmountWithdrawn() {
 
-        //поплнение за все месяцы
-        int repl = Integer.parseInt(replenishment.getText().replace(" ", ""));
         //начисленный процент
         double proc = Double.parseDouble(accuredInrest.getText().replace(",", ".").replace(" ", ""));
-        //сумма вклада
-        int summVklada = Integer.parseInt(depositAmount.getText().replace(" ", ""));
 
-        double expected = repl + proc + summVklada;
+        double expected = firstPay + monthlyPay * (monthsDeposit - 1) + proc;
 
         double actual = Double.parseDouble(amountWithdarwn.getText().replace(",", ".").replace(" ", ""));
 
