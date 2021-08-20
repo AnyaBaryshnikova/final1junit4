@@ -120,7 +120,7 @@ public class DepositPage extends BasePage {
     public DepositPage addMonths(int amount) {
         monthsDeposit = amount;
         int index = ((int)( amount / 3) + amount % 3);
-        monthsBtn.click();
+        waitUtilElementToBeClickable(monthsBtn).click();
         String el = String.format("//li[contains(text(), 'месяц')][%s]", index);
 
 
